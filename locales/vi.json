@@ -1,0 +1,49 @@
+{
+  "auth": {
+    "register_success": "Đăng ký thành công",
+    "login_success": "Đăng nhập thành công",
+    "logout_success": "Đăng xuất thành công",
+    "token_refreshed": "Làm mới token thành công",
+    "get_profile_success": "Lấy thông tin thành công",
+    "profile_updated": "Cập nhật thông tin thành công",
+    "password_changed": "Đổi mật khẩu thành công",
+    "otp_sent": "Mã OTP đã được gửi đến email của bạn",
+    "password_reset_success": "Đặt lại mật khẩu thành công",
+    "email_already_registered": "Email đã được đăng ký",
+    "invalid_credentials": "Email hoặc mật khẩu không đúng",
+    "account_banned": "Tài khoản đã bị khóa",
+    "current_password_incorrect": "Mật khẩu hiện tại không đúng",
+    "email_not_found": "Email không tồn tại",
+    "invalid_otp": "Mã OTP không hợp lệ",
+    "otp_expired": "Mã OTP đã hết hạn",
+    "user_not_found": "Người dùng không tồn tại",
+    "no_token": "Không có token",
+    "invalid_token": "Token không hợp lệ hoặc đã hết hạn",
+    "token_revoked": "Token đã bị thu hồi",
+    "refresh_token_required": "Cần có refresh token",
+    "invalid_refresh_token": "Refresh token không hợp lệ",
+    "refresh_token_not_found": "Refresh token không tồn tại",
+    "refresh_token_expired": "Refresh token đã hết hạn",
+    "unauthorized": "Chưa xác thực",
+    "forbidden": "Không có quyền truy cập"
+  },
+  "validation": {
+    "failed": "Dữ liệu không hợp lệ",
+    "email_invalid": "Email không hợp lệ",
+    "password_min_length": "Mật khẩu phải có ít nhất {{min}} ký tự",
+    "password_strong": "Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt",
+    "full_name_required": "Họ tên không được để trống",
+    "phone_invalid": "Số điện thoại không hợp lệ",
+    "date_of_birth_invalid": "Ngày sinh không hợp lệ",
+    "date_of_birth_future": "Ngày sinh không được ở tương lai",
+    "age_minimum": "Bạn phải từ {{min}} tuổi trở lên",
+    "otp_invalid": "Mã OTP phải có 6 số",
+    "password_not_match": "Xác nhận mật khẩu không khớp",
+    "password_same_as_old": "Mật khẩu mới phải khác mật khẩu hiện tại"
+  },
+  "error": {
+    "server_error": "Lỗi máy chủ",
+    "not_found": "Không tìm thấy",
+    "bad_request": "Yêu cầu không hợp lệ"
+  }
+}

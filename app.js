@@ -5,9 +5,15 @@ const morgan = require('morgan');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger/swagger');
 const routes = require('./routes');
+// i18n middleware
+const i18n = require('./config/i18n.config');
+const i18nMiddleware = require('./middlewares/i18n.middleware');
 const errorMiddleware = require('./middlewares/error.middleware');
 
 const app = express();
+
+app.use(i18n.init);
+app.use(i18nMiddleware);
 
 // Middlewares
 app.use(cors({
@@ -18,8 +24,29 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Swagger Authentication Middleware
+const swaggerAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Swagger Documentation"');
+    return res.status(401).send('Authentication required');
+  }
+
+  const auth = Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
+  const username = auth[0];
+  const password = auth[1];
+
+  if (username === process.env.SWAGGER_USERNAME && password === process.env.SWAGGER_PASSWORD) {
+    return next();
+  }
+
+  res.setHeader('WWW-Authenticate', 'Basic realm="Swagger Documentation"');
+  return res.status(401).send('Invalid credentials');
+};
+
 // Swagger Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerAuth, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check
 app.get('/health', (req, res) => {

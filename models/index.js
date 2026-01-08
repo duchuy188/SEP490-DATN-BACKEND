@@ -1,15 +1,19 @@
 const sequelize = require('../config/database');
+const User = require('./User');
+const RefreshToken = require('./RefreshToken');
+const BlacklistedToken = require('./BlacklistedToken');
+const PasswordReset = require('./PasswordReset');
 
-// Import models here
-// const User = require('./user.model');
+// Define associations
+User.hasMany(RefreshToken, { foreignKey: 'user_id', as: 'refreshTokens' });
+RefreshToken.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 const db = {
   sequelize,
-  // User,
+  User,
+  RefreshToken,
+  BlacklistedToken,
+  PasswordReset
 };
-
-// Define associations here
-// User.hasMany(Post);
-// Post.belongsTo(User);
 
 module.exports = db;

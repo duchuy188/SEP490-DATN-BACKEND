@@ -1,10 +1,16 @@
 class ResponseUtil {
   static success(res, data, message = 'Success', statusCode = 200) {
-    return res.status(statusCode).json({
+    const response = {
       success: true,
-      message,
-      data
-    });
+      message
+    };
+    
+    // Chỉ thêm data nếu không null/undefined
+    if (data !== null && data !== undefined) {
+      response.data = data;
+    }
+    
+    return res.status(statusCode).json(response);
   }
 
   static error(res, message = 'Error', statusCode = 500, errors = null) {

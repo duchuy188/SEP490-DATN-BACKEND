@@ -1,0 +1,49 @@
+{
+  "auth": {
+    "register_success": "Registration successful",
+    "login_success": "Login successful",
+    "logout_success": "Logout successful",
+    "token_refreshed": "Token refreshed successfully",
+    "get_profile_success": "Get profile successful",
+    "profile_updated": "Profile updated successfully",
+    "password_changed": "Password changed successfully",
+    "otp_sent": "OTP has been sent to your email",
+    "password_reset_success": "Password reset successfully",
+    "email_already_registered": "Email already registered",
+    "invalid_credentials": "Invalid email or password",
+    "account_banned": "Account is banned",
+    "current_password_incorrect": "Current password is incorrect",
+    "email_not_found": "Email not found",
+    "invalid_otp": "Invalid OTP",
+    "otp_expired": "OTP has expired",
+    "user_not_found": "User not found",
+    "no_token": "No token provided",
+    "invalid_token": "Invalid or expired token",
+    "token_revoked": "Token has been revoked",
+    "refresh_token_required": "Refresh token required",
+    "invalid_refresh_token": "Invalid refresh token",
+    "refresh_token_not_found": "Refresh token not found",
+    "refresh_token_expired": "Refresh token expired",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden"
+  },
+  "validation": {
+    "failed": "Validation failed",
+    "email_invalid": "Invalid email",
+    "password_min_length": "Password must be at least {{min}} characters",
+    "password_strong": "Password must contain at least 1 uppercase, 1 lowercase, 1 number and 1 special character",
+    "full_name_required": "Full name is required",
+    "phone_invalid": "Invalid phone number",
+    "date_of_birth_invalid": "Invalid date of birth",
+    "date_of_birth_future": "Date of birth cannot be in the future",
+    "age_minimum": "You must be at least {{min}} years old",
+    "otp_invalid": "OTP must be 6 digits",
+    "password_not_match": "Password confirmation does not match",
+    "password_same_as_old": "New password must be different from current password"
+  },
+  "error": {
+    "server_error": "Server error",
+    "not_found": "Not found",
+    "bad_request": "Bad request"
+  }
+}

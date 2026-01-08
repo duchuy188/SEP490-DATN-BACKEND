@@ -1,26 +1,73 @@
-const jwt = require('jsonwebtoken');
-const { jwt: jwtConfig } = require('../config/app.config');
+const JwtUtil = require('../utils/jwt.util');
+const ResponseUtil = require('../utils/response.util');
+const { User, BlacklistedToken } = require('../models');
+const i18nMiddleware = require('./i18n.middleware');
 
-const authMiddleware = (req, res, next) => {
+/**
+ * Middleware xác thực JWT token
+ * Kiểm tra token trong header Authorization và gắn thông tin user vào req.user
+ */
+const authMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'No token provided' }
-      });
+      return ResponseUtil.unauthorized(res, 'No token provided');
     }
 
-    const decoded = jwt.verify(token, jwtConfig.secret);
-    req.user = decoded;
+    const blacklisted = await BlacklistedToken.findOne({ where: { token } });
+    if (blacklisted) {
+      return ResponseUtil.unauthorized(res, 'Token has been revoked');
+    }
+
+    const decoded = JwtUtil.verifyToken(token);
+    if (!decoded) {
+      return ResponseUtil.unauthorized(res, 'Invalid or expired token');
+    }
+
+
+    if (decoded.type !== 'access') {
+      return ResponseUtil.unauthorized(res, 'Invalid token type');
+    }
+
+
+    const user = await User.findByPk(decoded.userId);
+    if (!user) {
+      return ResponseUtil.unauthorized(res, 'User not found');
+    }
+
+    if (user.status === 'banned') {
+      return ResponseUtil.forbidden(res, 'Account is banned');
+    }
+
+
+    req.user = user;
+
+
+    if (user.language) {
+      req.setLocale(user.language);
+    }
+
     next();
   } catch (error) {
-    return res.status(401).json({
-      success: false,
-      error: { message: 'Invalid or expired token' }
-    });
+    return ResponseUtil.error(res, 'Authentication error');
   }
 };
 
+// Role-based authorization middleware
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return ResponseUtil.unauthorized(res, 'Unauthorized');
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return ResponseUtil.forbidden(res, 'Insufficient permissions');
+    }
+
+    next();
+  };
+};
+
 module.exports = authMiddleware;
+module.exports.authorize = authorize;
