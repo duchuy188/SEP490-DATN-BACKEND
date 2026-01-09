@@ -27,6 +27,19 @@
     "unauthorized": "Unauthorized",
     "forbidden": "Forbidden"
   },
+  "admin": {
+    "get_users_success": "Get users successfully",
+    "get_user_success": "Get user successfully",
+    "user_not_found": "User not found",
+    "invalid_status": "Invalid status. Must be 'active' or 'banned'",
+    "user_blocked": "User blocked successfully",
+    "user_unblocked": "User unblocked successfully",
+    "cannot_change_admin_status": "Cannot change admin status",
+    "invalid_role": "Invalid role. Must be 'pilgrim' or 'local_guide'",
+    "role_updated": "User role updated successfully",
+    "cannot_change_admin_role": "Cannot change admin role",
+    "user_updated": "User information updated successfully"
+  },
   "validation": {
     "failed": "Validation failed",
     "email_invalid": "Invalid email",

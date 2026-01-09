@@ -47,7 +47,7 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         defaultValue: 'active',
         validate: {
-            isIn: [['active', 'banned', 'pending']]
+            isIn: [['active', 'banned']]
         }
     },
     language: {

@@ -34,7 +34,7 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
     const result = await AuthService.login(email, password);
 
-    // Get user and set locale based on their language preference
+   
     const { User } = require('../models');
     const user = await User.findOne({ where: { email: email.toLowerCase().trim() } });
     if (user && user.language) {
@@ -43,6 +43,13 @@ exports.login = async (req, res) => {
 
     return ResponseUtil.success(res, result, req.__('auth.login_success'));
   } catch (error) {
+   
+    const { User } = require('../models');
+    const user = await User.findOne({ where: { email: req.body.email?.toLowerCase().trim() } });
+    if (user && user.language) {
+      req.setLocale(user.language);
+    }
+
     if (error.message === 'Invalid email or password') {
       return ResponseUtil.unauthorized(res, req.__('auth.invalid_credentials'));
     }

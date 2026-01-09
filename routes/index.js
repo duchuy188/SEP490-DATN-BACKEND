@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authRoutes = require('./auth.routes');
+const adminRoutes = require('./admin.routes');
 
 router.get('/', (req, res) => {
   res.json({
@@ -9,12 +10,16 @@ router.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       docs: '/api-docs',
-      auth: '/api/auth'
+      auth: '/api/auth',
+      admin: '/api/admin'
     }
   });
 });
 
 // Auth routes
 router.use('/auth', authRoutes);
+
+// Admin routes
+router.use('/admin', adminRoutes);
 
 module.exports = router;

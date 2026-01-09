@@ -27,6 +27,19 @@
     "unauthorized": "Chưa xác thực",
     "forbidden": "Không có quyền truy cập"
   },
+  "admin": {
+    "get_users_success": "Lấy danh sách người dùng thành công",
+    "get_user_success": "Lấy thông tin người dùng thành công",
+    "user_not_found": "Không tìm thấy người dùng",
+    "invalid_status": "Status không hợp lệ. Phải là 'active' hoặc 'banned'",
+    "user_blocked": "Khóa người dùng thành công",
+    "user_unblocked": "Mở khóa người dùng thành công",
+    "cannot_change_admin_status": "Không thể thay đổi trạng thái admin",
+    "invalid_role": "Role không hợp lệ. Phải là 'pilgrim' hoặc 'local_guide'",
+    "role_updated": "Cập nhật role thành công",
+    "cannot_change_admin_role": "Không thể thay đổi role admin",
+    "user_updated": "Cập nhật thông tin người dùng thành công"
+  },
   "validation": {
     "failed": "Dữ liệu không hợp lệ",
     "email_invalid": "Email không hợp lệ",

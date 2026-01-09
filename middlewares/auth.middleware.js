@@ -37,7 +37,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     if (user.status === 'banned') {
-      return ResponseUtil.forbidden(res, 'Account is banned');
+      return ResponseUtil.forbidden(res, req.__('auth.account_banned'));
     }
 
 

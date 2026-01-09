@@ -254,7 +254,7 @@ class AuthService {
             // Update password
             await user.update({ password_hash: newPasswordHash });
 
-            // Xóa tất cả refresh tokens để force logout tất cả devices khi hết hạn access token
+           
             await RefreshToken.destroy({ where: { user_id: userId } });
 
             Logger.info(`Password changed: ${userId}`);
@@ -279,8 +279,7 @@ class AuthService {
 
           
             const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
+            const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
           
             await PasswordReset.create({
                 user_id: user.id,
