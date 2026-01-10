@@ -25,12 +25,24 @@
  *           example: "1990-01-01"
  *         role:
  *           type: string
- *           enum: [admin, pilgrim, local_guide]
+ *           enum: [admin, pilgrim, local_guide, manager]
  *           example: "pilgrim"
  *         status:
  *           type: string
  *           enum: [active, banned]
  *           example: "active"
+ *         site_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           example: "uuid-here"
+ *           description: "Site được gán (chỉ cho manager/local_guide)"
+ *         verified_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: "2024-01-01T00:00:00.000Z"
+ *           description: "Thời điểm xác minh (cho manager)"
  *         created_at:
  *           type: string
  *           format: date-time
@@ -101,9 +113,15 @@
  *           description: "Ngày sinh mới"
  *         role:
  *           type: string
- *           enum: [pilgrim, local_guide]
+ *           enum: [pilgrim, local_guide, manager]
  *           example: "local_guide"
  *           description: "Role mới (không thể đổi thành admin)"
+ *         site_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           example: "uuid-here"
+ *           description: "Site ID (bắt buộc cho manager/local_guide, null cho pilgrim)"
  *
  *     UserUpdateResponse:
  *       type: object
@@ -133,6 +151,14 @@
  *               type: string
  *             status:
  *               type: string
+ *             site_id:
+ *               type: string
+ *               format: uuid
+ *               nullable: true
+ *             verified_at:
+ *               type: string
+ *               format: date-time
+ *               nullable: true
  */
 
 module.exports = {};

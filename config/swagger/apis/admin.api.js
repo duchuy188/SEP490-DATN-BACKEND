@@ -30,7 +30,7 @@
  *         name: role
  *         schema:
  *           type: string
- *           enum: [admin, pilgrim, local_guide]
+ *           enum: [admin, pilgrim, local_guide, manager]
  *         description: Lọc theo role
  *       - in: query
  *         name: status

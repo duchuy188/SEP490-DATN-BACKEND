@@ -77,7 +77,11 @@ class AdminValidator {
     
     body('role')
       .optional()
-      .isIn(['pilgrim', 'local_guide']).withMessage('Role phải là pilgrim hoặc local_guide (không thể đặt admin)')
+      .isIn(['pilgrim', 'local_guide', 'manager']).withMessage('Role phải là pilgrim, local_guide hoặc manager (không thể đặt admin)'),
+    
+    body('site_id')
+      .optional()
+      .isUUID().withMessage('Site ID phải là UUID hợp lệ')
   ];
 }
 

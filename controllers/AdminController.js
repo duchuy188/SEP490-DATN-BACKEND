@@ -102,6 +102,15 @@ exports.updateUser = async (req, res) => {
     if (error.message === 'Cannot change admin role') {
       return ResponseUtil.forbidden(res, req.__('admin.cannot_change_admin_role'));
     }
+    if (error.message === 'Invalid role') {
+      return ResponseUtil.badRequest(res, req.__('admin.invalid_role'));
+    }
+    if (error.message === 'Manager and Local Guide must be assigned to a site') {
+      return ResponseUtil.badRequest(res, req.__('admin.manager_must_have_site'));
+    }
+    if (error.message === 'Pilgrim cannot be assigned to a site') {
+      return ResponseUtil.badRequest(res, req.__('admin.pilgrim_cannot_have_site'));
+    }
     return ResponseUtil.error(res, req.__('error.server_error'));
   }
 };

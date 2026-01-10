@@ -1,12 +1,8 @@
--- DROP SCHEMA public CASCADE;
--- CREATE SCHEMA public;
+-- ============================================
+-- CATHOLIC PILGRIMAGE GUIDE APP - DATABASE SCHEMA
+-- Version: 2.0 (Redesigned for New Business Requirements)
+-- ============================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
--- Enable Trigram extension for text search
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-/*
 -- ============================================
 -- DROP ALL TABLES & RESET DATABASE (Uncomment when needed)
 -- ============================================
@@ -14,45 +10,71 @@ DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO public;
-*/
 
--- 1. ENUM Types
+-- ============================================
+-- EXTENSIONS
+-- ============================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- ============================================
+-- ENUM TYPES
+-- ============================================
 DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('admin', 'pilgrim', 'local_guide');
+    -- User & Auth
+    CREATE TYPE user_role AS ENUM ('admin', 'pilgrim', 'local_guide', 'manager');
     CREATE TYPE user_status AS ENUM ('active', 'banned');
+    
+    -- Sites
     CREATE TYPE site_region AS ENUM ('Bac', 'Trung', 'Nam');
     CREATE TYPE site_type AS ENUM ('church', 'shrine', 'monastery', 'center', 'other');
+    CREATE TYPE site_status AS ENUM ('pending', 'approved', 'rejected', 'hidden');
+    CREATE TYPE media_type AS ENUM ('image', 'video', 'panorama');
+    
+    -- Nearby Places (NEW)
+    CREATE TYPE nearby_place_category AS ENUM ('food', 'lodging', 'medical');
+    CREATE TYPE nearby_place_status AS ENUM ('pending', 'approved', 'rejected');
+    
+    -- Planner
     CREATE TYPE planner_status AS ENUM ('planning', 'ongoing', 'completed');
     CREATE TYPE planner_role AS ENUM ('viewer', 'editor');
-    CREATE TYPE journal_privacy AS ENUM ('private', 'public');
     CREATE TYPE budget_level AS ENUM ('budget', 'standard', 'luxury');
-    CREATE TYPE site_status AS ENUM ('pending', 'approved', 'rejected', 'hidden');
+    
+    -- Journal & Community
+    CREATE TYPE journal_privacy AS ENUM ('private', 'public');
     CREATE TYPE content_status AS ENUM ('draft', 'published', 'pending', 'approved', 'rejected', 'hidden');
-    CREATE TYPE media_type AS ENUM ('image', 'video', 'virtual_tour');
-    CREATE TYPE ai_type AS ENUM ('prayer', 'verse', 'summary', 'sentiment');
-    CREATE TYPE ai_source_type AS ENUM ('journal', 'planner', 'post', 'chat');
     CREATE TYPE group_privacy AS ENUM ('public', 'private', 'closed');
     CREATE TYPE group_member_role AS ENUM ('admin', 'member');
+    
+    -- AI (UPDATED - removed prayer/verse)
+    CREATE TYPE ai_type AS ENUM ('summary', 'sentiment', 'rewrite', 'topic_suggestion');
+    CREATE TYPE ai_source_type AS ENUM ('journal', 'planner', 'post', 'chat');
+    
+    -- Others
     CREATE TYPE report_reason AS ENUM ('spam', 'inappropriate', 'harassment', 'other');
     CREATE TYPE report_status AS ENUM ('pending', 'resolved', 'dismissed');
     CREATE TYPE sos_status AS ENUM ('pending', 'accepted', 'resolved', 'cancelled');
     CREATE TYPE invite_status AS ENUM ('pending', 'accepted', 'rejected', 'expired');
     CREATE TYPE participant_status AS ENUM ('going', 'interested');
-    CREATE TYPE verification_status AS ENUM ('pending', 'approved', 'rejected');
+    
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- Trigger Function for Auto-Update updated_at
+-- ============================================
+-- TRIGGER FUNCTIONS
+-- ============================================
+
+-- Auto-update updated_at column
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE 'plpgsql';
 
--- Trigger Function for Auto-Update likes_count
+-- Auto-update likes_count
 CREATE OR REPLACE FUNCTION update_post_likes_count()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -65,7 +87,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 2. Users Table
+-- ============================================
+-- CORE TABLES
+-- ============================================
+
+-- ============================================
+-- 1. USERS TABLE (FIRST - no dependencies)
+-- ============================================
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -77,145 +105,29 @@ CREATE TABLE IF NOT EXISTS users (
     role user_role NOT NULL DEFAULT 'pilgrim',
     status user_status NOT NULL DEFAULT 'active',
     language VARCHAR(5) NOT NULL DEFAULT 'vi',
+    
+    -- NEW: Simplified Manager/Guide management
+    site_id UUID, -- Will add FK after sites table created
+    verified_at TIMESTAMP WITH TIME ZONE, -- For managers
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Trigger for users
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_site ON users(site_id) WHERE site_id IS NOT NULL;
+
+-- Trigger
 DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- 2.1 Refresh Tokens 
-CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(500) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2.2 Blacklisted Tokens 
-CREATE TABLE IF NOT EXISTS blacklisted_tokens (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    token VARCHAR(500) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2.3 Password Resets
-CREATE TABLE IF NOT EXISTS password_resets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    email VARCHAR(255) NOT NULL,
-    otp VARCHAR(6) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    is_used BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2.4 AI Generated Contents
-CREATE TABLE IF NOT EXISTS ai_generated_contents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type ai_type NOT NULL,
-    source_type ai_source_type, -- Context of generation
-    source_id UUID, -- ID of the related content (journal_id, planner_id, etc.)
-    prompt TEXT,
-    result TEXT, -- Or JSONB if structured
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2.5 Verification Requests (Local Guide Application)
-CREATE TABLE IF NOT EXISTS verification_requests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Option 1: Chon site co san
-    requested_site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
-    
-    -- Option 2: De xuat site moi (neu requested_site_id NULL)
-    proposed_site_name VARCHAR(255),
-    proposed_site_address TEXT,
-    proposed_site_province VARCHAR(100),
-    proposed_site_district VARCHAR(100),
-    proposed_site_region site_region,
-    proposed_site_type site_type,
-    proposed_site_latitude DECIMAL(9,6) CHECK (proposed_site_latitude IS NULL OR (proposed_site_latitude BETWEEN -90 AND 90)),
-    proposed_site_longitude DECIMAL(9,6) CHECK (proposed_site_longitude IS NULL OR (proposed_site_longitude BETWEEN -180 AND 180)),
-    proposed_site_description TEXT,
-    
-    certificate_url TEXT, -- Giay chung nhan / The HDV / Giay gioi thieu
-    introduction TEXT,    -- Gioi thieu ngan
-    status verification_status DEFAULT 'pending',
-    reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    rejection_reason TEXT,
-    verified_at TIMESTAMP WITH TIME ZONE,
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Unique index: Chi cho phep 1 pending request/user (user co the apply lai sau khi bi reject)
-CREATE UNIQUE INDEX IF NOT EXISTS uq_verification_requests_user_pending
-ON verification_requests(user_id) 
-WHERE status = 'pending';
-
--- Performance indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_verification_requests_status 
-ON verification_requests(status);
-
-CREATE INDEX IF NOT EXISTS idx_verification_requests_site 
-ON verification_requests(requested_site_id) 
-WHERE requested_site_id IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_verification_requests_reviewer 
-ON verification_requests(reviewed_by) 
-WHERE reviewed_by IS NOT NULL;
-
--- Check constraint: Phai chon 1 trong 2 (site co san HOAC de xuat moi)
--- Neu de xuat moi: bat buoc co name, province, region, type
-ALTER TABLE verification_requests
-ADD CONSTRAINT chk_site_selection
-CHECK (
-  (requested_site_id IS NOT NULL AND proposed_site_name IS NULL) OR
-  (requested_site_id IS NULL AND 
-   proposed_site_name IS NOT NULL AND 
-   proposed_site_province IS NOT NULL AND
-   proposed_site_region IS NOT NULL AND 
-   proposed_site_type IS NOT NULL)
-);
-
--- Check constraint for rejection reason
-ALTER TABLE verification_requests
-ADD CONSTRAINT chk_verification_reason
-CHECK (
-  (status <> 'rejected'::verification_status OR rejection_reason IS NOT NULL)
-);
-
--- Trigger for verification_requests
-DROP TRIGGER IF EXISTS update_verification_requests_updated_at ON verification_requests;
-CREATE TRIGGER update_verification_requests_updated_at
-    BEFORE UPDATE ON verification_requests
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- 2.6 Local Guides (Approved Guides)
-CREATE TABLE IF NOT EXISTS local_guides (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    verified_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    verified_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    note TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_local_guides_site
-ON local_guides(site_id);
-
--- 3. SITE MODULE
--- 3.1 Sites Table (Dia Diem)
+-- ============================================
+-- 2. SITES TABLE (SECOND - before FK references)
+-- ============================================
 CREATE TABLE IF NOT EXISTS sites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -239,14 +151,96 @@ CREATE TABLE IF NOT EXISTS sites (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Trigger for sites
+CREATE INDEX IF NOT EXISTS idx_sites_name_trgm ON sites USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_sites_search ON sites(name, province, district);
+CREATE INDEX IF NOT EXISTS idx_sites_coords ON sites(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_sites_region_type ON sites(region, type);
+CREATE INDEX IF NOT EXISTS idx_sites_status ON sites(status);
+
+-- Trigger
 DROP TRIGGER IF EXISTS update_sites_updated_at ON sites;
 CREATE TRIGGER update_sites_updated_at
     BEFORE UPDATE ON sites
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- 3.2 Site Media
+-- Now add FK from users to sites
+ALTER TABLE users
+ADD CONSTRAINT fk_users_site
+FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE SET NULL;
+
+-- Constraint: Only 1 manager per site
+CREATE UNIQUE INDEX IF NOT EXISTS uq_manager_site 
+ON users(site_id) 
+WHERE role = 'manager';
+
+-- Constraint: Role-Site validation rules
+-- manager/local_guide MUST have site_id
+-- pilgrim MUST NOT have site_id
+-- admin can have or not
+ALTER TABLE users
+ADD CONSTRAINT chk_users_role_site
+CHECK (
+  (role IN ('manager', 'local_guide') AND site_id IS NOT NULL)
+  OR (role = 'pilgrim' AND site_id IS NULL)
+  OR (role = 'admin')
+);
+
+-- ============================================
+-- 3. AUTH & SECURITY TABLES
+-- ============================================
+
+-- 3.1 Refresh Tokens
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(500) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+
+-- 3.2 Blacklisted Tokens
+CREATE TABLE IF NOT EXISTS blacklisted_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    token VARCHAR(500) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3.3 Password Resets
+CREATE TABLE IF NOT EXISTS password_resets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    otp VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 4. AI GENERATED CONTENTS
+-- ============================================
+CREATE TABLE IF NOT EXISTS ai_generated_contents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type ai_type NOT NULL,
+    source_type ai_source_type,
+    source_id UUID,
+    prompt TEXT,
+    result TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_contents_user ON ai_generated_contents(user_id);
+
+-- ============================================
+-- 5. SITE MODULE TABLES
+-- ============================================
+
+-- 5.1 Site Media
 CREATE TABLE IF NOT EXISTS site_media (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -257,11 +251,12 @@ CREATE TABLE IF NOT EXISTS site_media (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_site_media_site ON site_media(site_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_site_media_main
 ON site_media(site_id)
 WHERE is_main = TRUE;
 
--- 3.3 Mass Schedules
+-- 5.2 Mass Schedules (UPDATED - added status)
 CREATE TABLE IF NOT EXISTS mass_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -269,10 +264,14 @@ CREATE TABLE IF NOT EXISTS mass_schedules (
     time TIME NOT NULL,
     language VARCHAR(50) DEFAULT 'Tiếng Việt',
     note TEXT,
+    status site_status DEFAULT 'approved',
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3.4 Events
+CREATE INDEX IF NOT EXISTS idx_mass_schedules_site ON mass_schedules(site_id);
+
+-- 5.3 Events
 CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
@@ -286,6 +285,9 @@ CREATE TABLE IF NOT EXISTS events (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_events_site ON events(site_id);
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+
 CREATE TABLE IF NOT EXISTS event_participants (
     event_id UUID REFERENCES events(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -294,7 +296,35 @@ CREATE TABLE IF NOT EXISTS event_participants (
     PRIMARY KEY (event_id, user_id)
 );
 
--- 4. Planner Modules
+-- ============================================
+-- 6. GUIDE SHIFTS (NEW)
+-- ============================================
+CREATE TABLE IF NOT EXISTS guide_shifts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    guide_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    day_of_week INT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_guide_shifts_guide ON guide_shifts(guide_id);
+CREATE INDEX IF NOT EXISTS idx_guide_shifts_site ON guide_shifts(site_id);
+CREATE INDEX IF NOT EXISTS idx_guide_shifts_day ON guide_shifts(day_of_week, is_active);
+
+-- Trigger
+DROP TRIGGER IF EXISTS update_guide_shifts_updated_at ON guide_shifts;
+CREATE TRIGGER update_guide_shifts_updated_at
+    BEFORE UPDATE ON guide_shifts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 7. PLANNER MODULE
+-- ============================================
 CREATE TABLE IF NOT EXISTS planners (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -306,22 +336,33 @@ CREATE TABLE IF NOT EXISTS planners (
     budget_level budget_level DEFAULT 'standard',
     status planner_status DEFAULT 'planning',
     is_public BOOLEAN DEFAULT FALSE,
-    share_token VARCHAR(50) UNIQUE DEFAULT NULL, -- For sharing link
+    share_token VARCHAR(50) UNIQUE DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_planners_user ON planners(user_id);
+
+-- Trigger
+DROP TRIGGER IF EXISTS update_planners_updated_at ON planners;
+CREATE TRIGGER update_planners_updated_at
+    BEFORE UPDATE ON planners
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE IF NOT EXISTS planner_invites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     planner_id UUID NOT NULL REFERENCES planners(id) ON DELETE CASCADE,
     inviter_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    email VARCHAR(255) NOT NULL, -- Invite via email (Targeted invite)
+    email VARCHAR(255) NOT NULL,
     token VARCHAR(100) NOT NULL,
     role planner_role DEFAULT 'viewer',
     status invite_status DEFAULT 'pending',
     expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_planner_invites_token ON planner_invites(token);
 
 CREATE TABLE IF NOT EXISTS planner_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -333,8 +374,9 @@ CREATE TABLE IF NOT EXISTS planner_items (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_planner_items_planner ON planner_items(planner_id);
 ALTER TABLE planner_items
-    ADD CONSTRAINT uq_planner_items_order UNIQUE (planner_id, day_number, order_index);
+ADD CONSTRAINT uq_planner_items_order UNIQUE (planner_id, day_number, order_index);
 
 CREATE TABLE IF NOT EXISTS planner_members (
     planner_id UUID REFERENCES planners(id) ON DELETE CASCADE,
@@ -344,7 +386,11 @@ CREATE TABLE IF NOT EXISTS planner_members (
     PRIMARY KEY (planner_id, user_id)
 );
 
--- 5. Interaction Modules
+-- ============================================
+-- 8. USER INTERACTIONS
+-- ============================================
+
+-- 8.1 Favorites
 CREATE TABLE IF NOT EXISTS user_favorites (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
@@ -352,15 +398,42 @@ CREATE TABLE IF NOT EXISTS user_favorites (
     PRIMARY KEY (user_id, site_id)
 );
 
+-- 8.2 Check-ins (UPDATED - added GPS)
 CREATE TABLE IF NOT EXISTS user_checkins (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
+    latitude DECIMAL(9,6),
+    longitude DECIMAL(9,6),
     checkin_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     note TEXT
 );
 
--- 6. Journal & Community
+CREATE INDEX IF NOT EXISTS idx_user_checkins_user ON user_checkins(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_checkins_site ON user_checkins(site_id);
+
+-- ============================================
+-- 9. PRAYER NOTES (NEW - Prayer Offering)
+-- ============================================
+CREATE TABLE IF NOT EXISTS prayer_notes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    checkin_id UUID NOT NULL REFERENCES user_checkins(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    privacy journal_privacy DEFAULT 'private',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_prayer_notes_user ON prayer_notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_prayer_notes_site ON prayer_notes(site_id);
+CREATE INDEX IF NOT EXISTS idx_prayer_notes_privacy ON prayer_notes(privacy) WHERE privacy = 'public';
+
+-- ============================================
+-- 10. JOURNAL & COMMUNITY
+-- ============================================
+
+-- 10.1 Journals
 CREATE TABLE IF NOT EXISTS journals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -374,6 +447,16 @@ CREATE TABLE IF NOT EXISTS journals (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_journals_user ON journals(user_id);
+
+-- Trigger
+DROP TRIGGER IF EXISTS update_journals_updated_at ON journals;
+CREATE TRIGGER update_journals_updated_at
+    BEFORE UPDATE ON journals
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- 10.2 Groups
 CREATE TABLE IF NOT EXISTS groups (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -385,6 +468,13 @@ CREATE TABLE IF NOT EXISTS groups (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Trigger
+DROP TRIGGER IF EXISTS update_groups_updated_at ON groups;
+CREATE TRIGGER update_groups_updated_at
+    BEFORE UPDATE ON groups
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TABLE IF NOT EXISTS group_members (
     group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -393,17 +483,11 @@ CREATE TABLE IF NOT EXISTS group_members (
     PRIMARY KEY (group_id, user_id)
 );
 
--- Trigger for groups
-DROP TRIGGER IF EXISTS update_groups_updated_at ON groups;
-CREATE TRIGGER update_groups_updated_at
-    BEFORE UPDATE ON groups
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
+-- 10.3 Posts
 CREATE TABLE IF NOT EXISTS posts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    group_id UUID REFERENCES groups(id) ON DELETE CASCADE, -- Nullable if personal wall post
+    group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     image_urls TEXT[],
     likes_count INT DEFAULT 0,
@@ -412,7 +496,10 @@ CREATE TABLE IF NOT EXISTS posts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Trigger for posts auto update
+CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_posts_group ON posts(group_id);
+
+-- Trigger
 DROP TRIGGER IF EXISTS update_posts_updated_at ON posts;
 CREATE TRIGGER update_posts_updated_at
     BEFORE UPDATE ON posts
@@ -426,20 +513,31 @@ CREATE TABLE IF NOT EXISTS post_likes (
     PRIMARY KEY (post_id, user_id)
 );
 
+-- Trigger for syncing likes_count
+DROP TRIGGER IF EXISTS trigger_update_post_likes_count ON post_likes;
+CREATE TRIGGER trigger_update_post_likes_count
+    AFTER INSERT OR DELETE ON post_likes
+    FOR EACH ROW
+    EXECUTE FUNCTION update_post_likes_count();
+
 CREATE TABLE IF NOT EXISTS post_comments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
-    status content_status DEFAULT 'published', 
+    status content_status DEFAULT 'published',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. Moderation & Reports
+CREATE INDEX IF NOT EXISTS idx_post_comments_post ON post_comments(post_id);
+
+-- ============================================
+-- 11. MODERATION & REPORTS
+-- ============================================
 CREATE TABLE IF NOT EXISTS reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     reporter_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    target_type VARCHAR(50) NOT NULL, -- post, comment, user, journal, group
+    target_type VARCHAR(50) NOT NULL,
     target_id UUID NOT NULL,
     reason report_reason NOT NULL,
     description TEXT,
@@ -449,64 +547,78 @@ CREATE TABLE IF NOT EXISTS reports (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Trigger for reports
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+
+-- Trigger
 DROP TRIGGER IF EXISTS update_reports_updated_at ON reports;
 CREATE TRIGGER update_reports_updated_at
     BEFORE UPDATE ON reports
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Trigger for planners
-DROP TRIGGER IF EXISTS update_planners_updated_at ON planners;
-CREATE TRIGGER update_planners_updated_at
-    BEFORE UPDATE ON planners
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- Trigger for journals
-DROP TRIGGER IF EXISTS update_journals_updated_at ON journals;
-CREATE TRIGGER update_journals_updated_at
-    BEFORE UPDATE ON journals
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- Additional Unique Indexes
-CREATE UNIQUE INDEX IF NOT EXISTS uq_planner_invites_token ON planner_invites(token);
--- GIN Index for Fast Text Search (requires pg_trgm)
-CREATE INDEX IF NOT EXISTS idx_sites_name_trgm ON sites USING GIN (name gin_trgm_ops);
-
--- Trigger for syncing likes_count
-DROP TRIGGER IF EXISTS trigger_update_post_likes_count ON post_likes;
-CREATE TRIGGER trigger_update_post_likes_count
-    AFTER INSERT OR DELETE ON post_likes
-    FOR EACH ROW
-    EXECUTE FUNCTION update_post_likes_count();
-
--- 8. SOS & Emergency
+-- ============================================
+-- 12. SOS & EMERGENCY
+-- ============================================
 CREATE TABLE IF NOT EXISTS sos_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    site_id UUID REFERENCES sites(id), -- If at a specific site
+    site_id UUID REFERENCES sites(id),
     latitude DECIMAL(9,6),
     longitude DECIMAL(9,6),
     message TEXT,
     contact_phone VARCHAR(20),
     status sos_status DEFAULT 'pending',
-    notes TEXT, -- Notes from guide/admin
+    notes TEXT,
     resolved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_sites_search ON sites(name, province, district);
-CREATE INDEX IF NOT EXISTS idx_sites_coords ON sites(latitude, longitude);
-CREATE INDEX IF NOT EXISTS idx_sites_region_type ON sites(region, type);
-CREATE INDEX IF NOT EXISTS idx_sites_status ON sites(status);
-CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
-CREATE INDEX IF NOT EXISTS idx_planners_user ON planners(user_id);
-CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id);
-CREATE INDEX IF NOT EXISTS idx_posts_group ON posts(group_id);
-CREATE INDEX IF NOT EXISTS idx_ai_contents_user ON ai_generated_contents(user_id);
 CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_requests(status);
-CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests(status);
+CREATE INDEX IF NOT EXISTS idx_sos_site ON sos_requests(site_id);
+
+-- ============================================
+-- 13. NOTIFICATIONS (NEW)
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    message TEXT,
+    data JSONB,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_receiver ON notifications(receiver_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(receiver_id, is_read) WHERE is_read = FALSE;
+
+-- ============================================
+-- 14. NEARBY PLACES (NEW)
+-- ============================================
+CREATE TABLE IF NOT EXISTS nearby_places (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    proposed_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    category nearby_place_category NOT NULL,
+    address TEXT,
+    latitude DECIMAL(9,6) NOT NULL,
+    longitude DECIMAL(9,6) NOT NULL,
+    distance_meters INT,
+    phone VARCHAR(20),
+    description TEXT,
+    status nearby_place_status DEFAULT 'pending',
+    reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_nearby_places_site ON nearby_places(site_id);
+CREATE INDEX IF NOT EXISTS idx_nearby_places_status ON nearby_places(status);
+CREATE INDEX IF NOT EXISTS idx_nearby_places_category ON nearby_places(category);
+
+-- Constraint: Distance ≤ 5km
+ALTER TABLE nearby_places
+ADD CONSTRAINT chk_nearby_distance
+CHECK (distance_meters IS NULL OR distance_meters <= 5000);

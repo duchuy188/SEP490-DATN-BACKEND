@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authRoutes = require('./auth.routes');
 const adminRoutes = require('./admin.routes');
+const siteRoutes = require('./site.routes');
 
 router.get('/', (req, res) => {
   res.json({
@@ -11,7 +12,8 @@ router.get('/', (req, res) => {
       health: '/health',
       docs: '/api-docs',
       auth: '/api/auth',
-      admin: '/api/admin'
+      admin: '/api/admin',
+      sites: '/api/sites'
     }
   });
 });
@@ -21,5 +23,8 @@ router.use('/auth', authRoutes);
 
 // Admin routes
 router.use('/admin', adminRoutes);
+
+// Site routes
+router.use('/sites', siteRoutes);
 
 module.exports = router;

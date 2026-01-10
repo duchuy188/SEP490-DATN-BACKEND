@@ -13,7 +13,7 @@ const User = sequelize.define('User', {
         unique: true,
         validate: {
             isEmail: true
-            
+
         }
     },
     password_hash: {
@@ -40,7 +40,7 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         defaultValue: 'pilgrim',
         validate: {
-            isIn: [['admin', 'pilgrim', 'local_guide']]
+            isIn: [['admin', 'pilgrim', 'local_guide', 'manager']]
         }
     },
     status: {
@@ -56,6 +56,20 @@ const User = sequelize.define('User', {
         validate: {
             isIn: [['vi', 'en']]
         }
+    },
+    // NEW: Simplified Manager/Guide management
+    site_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'sites',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
+    },
+    verified_at: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 }, {
     tableName: 'users',

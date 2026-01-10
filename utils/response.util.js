@@ -42,6 +42,10 @@ class ResponseUtil {
   static badRequest(res, message = 'Bad request', errors = null) {
     return this.error(res, message, 400, errors);
   }
+
+  static conflict(res, message = 'Conflict') {
+    return this.error(res, message, 409);
+  }
 }
 
 module.exports = ResponseUtil;

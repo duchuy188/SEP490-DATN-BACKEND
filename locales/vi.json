@@ -35,10 +35,16 @@
     "user_blocked": "Khóa người dùng thành công",
     "user_unblocked": "Mở khóa người dùng thành công",
     "cannot_change_admin_status": "Không thể thay đổi trạng thái admin",
-    "invalid_role": "Role không hợp lệ. Phải là 'pilgrim' hoặc 'local_guide'",
+    "invalid_role": "Role không hợp lệ. Phải là 'pilgrim', 'local_guide' hoặc 'manager'",
     "role_updated": "Cập nhật role thành công",
     "cannot_change_admin_role": "Không thể thay đổi role admin",
-    "user_updated": "Cập nhật thông tin người dùng thành công"
+    "user_updated": "Cập nhật thông tin người dùng thành công",
+    "manager_must_have_site": "Manager và Local Guide phải được gán vào một địa điểm",
+    "pilgrim_cannot_have_site": "Pilgrim không thể được gán vào địa điểm"
+  },
+  "site": {
+    "create_success": "Tạo địa điểm thành công",
+    "already_exists": "Địa điểm đã tồn tại"
   },
   "validation": {
     "failed": "Dữ liệu không hợp lệ",

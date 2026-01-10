@@ -22,7 +22,7 @@ class AdminService {
       const where = {};
 
 
-      if (role && ['admin', 'pilgrim', 'local_guide'].includes(role)) {
+      if (role && ['admin', 'pilgrim', 'local_guide', 'manager'].includes(role)) {
         where.role = role;
       }
 
@@ -142,7 +142,7 @@ class AdminService {
       }
 
 
-      const allowedFields = ['full_name', 'phone', 'date_of_birth', 'role'];
+      const allowedFields = ['full_name', 'phone', 'date_of_birth', 'role', 'site_id'];
       const dataToUpdate = {};
 
       allowedFields.forEach(field => {
@@ -151,14 +151,40 @@ class AdminService {
         }
       });
 
-      // Validate role if provided
-      if (dataToUpdate.role && !['pilgrim', 'local_guide'].includes(dataToUpdate.role)) {
+
+      if (dataToUpdate.role && !['pilgrim', 'local_guide', 'manager'].includes(dataToUpdate.role)) {
         throw new Error('Invalid role');
       }
 
-      // Prevent changing admin role
+
       if (dataToUpdate.role && user.role === 'admin') {
         throw new Error('Cannot change admin role');
+      }
+
+      // NEW: Validate role-site_id relationship
+      if (dataToUpdate.role) {
+        // manager/local_guide MUST have site_id
+        if (['manager', 'local_guide'].includes(dataToUpdate.role)) {
+          const finalSiteId = dataToUpdate.site_id !== undefined ? dataToUpdate.site_id : user.site_id;
+          if (!finalSiteId) {
+            throw new Error('Manager and Local Guide must be assigned to a site');
+          }
+        }
+        // pilgrim MUST NOT have site_id
+        if (dataToUpdate.role === 'pilgrim') {
+          dataToUpdate.site_id = null;
+        }
+      }
+
+      // If changing site_id, validate role
+      if (dataToUpdate.site_id !== undefined) {
+        const finalRole = dataToUpdate.role || user.role;
+        if (finalRole === 'pilgrim' && dataToUpdate.site_id !== null) {
+          throw new Error('Pilgrim cannot be assigned to a site');
+        }
+        if (['manager', 'local_guide'].includes(finalRole) && !dataToUpdate.site_id) {
+          throw new Error('Manager and Local Guide must be assigned to a site');
+        }
       }
 
       await user.update(dataToUpdate);
@@ -172,7 +198,9 @@ class AdminService {
         phone: user.phone,
         date_of_birth: user.date_of_birth,
         role: user.role,
-        status: user.status
+        status: user.status,
+        site_id: user.site_id,
+        verified_at: user.verified_at
       };
     } catch (error) {
       Logger.error('Update user error:', error);
