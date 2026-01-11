@@ -1,6 +1,6 @@
 -- ============================================
 -- CATHOLIC PILGRIMAGE GUIDE APP - DATABASE SCHEMA
--- Version: 2.0 (Redesigned for New Business Requirements)
+
 -- ============================================
 
 -- ============================================
@@ -56,6 +56,9 @@ DO $$ BEGIN
     CREATE TYPE sos_status AS ENUM ('pending', 'accepted', 'resolved', 'cancelled');
     CREATE TYPE invite_status AS ENUM ('pending', 'accepted', 'rejected', 'expired');
     CREATE TYPE participant_status AS ENUM ('going', 'interested');
+    
+    -- Push Notifications
+    CREATE TYPE push_token_status AS ENUM ('active', 'revoked', 'expired');
     
 EXCEPTION
     WHEN duplicate_object THEN null;
@@ -219,6 +222,31 @@ CREATE TABLE IF NOT EXISTS password_resets (
     is_used BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 3.4 User Push Tokens (Expo Notifications)
+CREATE TABLE IF NOT EXISTS user_push_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expo_token VARCHAR(255) NOT NULL, -- ExponentPushToken[xxxx]
+    device_id VARCHAR(255), -- Optional: để phân biệt nhiều máy
+    platform VARCHAR(50) CHECK (platform IN ('ios', 'android', 'web')), -- Validate platform
+    status push_token_status DEFAULT 'active',
+    last_used_at TIMESTAMP WITH TIME ZONE, -- Track last successful notification
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON user_push_tokens(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_push_tokens_expo ON user_push_tokens(expo_token);
+CREATE INDEX IF NOT EXISTS idx_push_tokens_status ON user_push_tokens(status) WHERE status = 'active'; -- Partial index
+CREATE INDEX IF NOT EXISTS idx_push_tokens_device ON user_push_tokens(user_id, device_id) WHERE device_id IS NOT NULL;
+
+-- Trigger for user_push_tokens
+DROP TRIGGER IF EXISTS update_user_push_tokens_updated_at ON user_push_tokens;
+CREATE TRIGGER update_user_push_tokens_updated_at
+    BEFORE UPDATE ON user_push_tokens
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
 -- 4. AI GENERATED CONTENTS
